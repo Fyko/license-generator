@@ -24,12 +24,12 @@ pub struct LicenseContent {
 impl LicenseContent {
     // fetch license content
     pub fn fetch_license_content(url: &String) -> LicenseContent {
-        let license: LicenseContent = match ureq::get(&url).call() {
-            Ok(res) => res.into_json().unwrap(),
-            Err(error) => panic!("Unable to fetch license content: {}", error),
-        };
-
-        license
+        match ureq::get(&url).call() {
+            Ok(res) => res
+                .into_json::<LicenseContent>()
+                .expect("failed to parse license content json"),
+            Err(error) => panic!("Unable to fetch license content: {error}"),
+        }
     }
 }
 
@@ -42,19 +42,19 @@ impl Licenses {
     // fetch all licenses from github
     pub fn fetch_licenses() -> Licenses {
         let body: Vec<License> = match ureq::get("https://api.github.com/licenses").call() {
-            Ok(res) => res.into_json().unwrap(),
-            Err(error) => panic!("Unable to fetch licenses: {}", error),
+            Ok(res) => res.into_json().expect("failed to parse licenses json"),
+            Err(error) => panic!("Unable to fetch licenses: {error}"),
         };
 
         Licenses { license: body }
     }
 
     pub fn get_license_names(&self) -> Vec<String> {
-        self.license.iter().map(|l| String::from(&l.name)).collect()
+        self.license.iter().map(|l| l.name.to_string()).collect()
     }
 
     pub fn get_license_keys(&self) -> Vec<String> {
-        self.license.iter().map(|l| String::from(&l.key)).collect()
+        self.license.iter().map(|l| l.key.to_string()).collect()
     }
 
     pub fn get_license_from_name(&self, name: &String) -> LicenseContent {
@@ -62,11 +62,11 @@ impl Licenses {
 
         let result = lic
             .into_iter()
-            .filter(|l| l.name == name.clone())
-            .map(|l| l.url.clone())
-            .collect();
+            .find(|l| &l.name == name)
+            .map(|l| &l.url)
+            .expect("no license found for name");
 
-        LicenseContent::fetch_license_content(&result)
+        LicenseContent::fetch_license_content(result)
     }
 
     pub fn get_license_from_key(&self, key: &String) -> LicenseContent {
@@ -74,9 +74,9 @@ impl Licenses {
 
         let result = lic
             .into_iter()
-            .filter(|l| l.key == key.clone())
-            .map(|l| l.url.clone())
-            .collect();
+            .find(|l| &l.key == key)
+            .map(|l| &l.url)
+            .expect("no license found for key");
 
         LicenseContent::fetch_license_content(&result)
     }

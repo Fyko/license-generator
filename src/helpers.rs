@@ -1,5 +1,5 @@
 use crate::license;
-use chrono::{Datelike, Local};
+use time::OffsetDateTime;
 use dialoguer::{console::Style, theme::ColorfulTheme, FuzzySelect, Input};
 use license::LicenseContent;
 use std::{fs, io, process::Command};
@@ -61,17 +61,15 @@ fn get_git_username() -> Option<String> {
         .output()
         .ok()?;
 
-    let res: Option<String> = match cmd.status.success() {
-        true => Option::from(String::from_utf8_lossy(&cmd.stdout).to_string()),
-        false => Option::from(None),
-    };
-
-    res
+    match cmd.status.success() {
+        true => Some(String::from_utf8_lossy(&cmd.stdout).to_string()),
+        false => None,
+    }
 }
 
 // get name from user
 fn get_name(skip_prompt: bool) -> String {
-    let name: String = match get_git_username() {
+    match get_git_username() {
         Some(mut name) => {
             // removing trailing newline (cross platform way)
             if name.ends_with("\n") {
@@ -93,21 +91,17 @@ fn get_name(skip_prompt: bool) -> String {
             name
         }
         None => {
-            let input: String = Input::with_theme(&ColorfulTheme::default())
+            Input::with_theme(&ColorfulTheme::default())
                 .with_prompt("Name")
                 .interact_text()
-                .unwrap();
-
-            input
+                .unwrap()
         }
-    };
-
-    name
+    }
 }
 
 // get year from user
 fn get_year(skip_prompt: bool) -> String {
-    let current_year = Local::now().year();
+    let current_year = OffsetDateTime::now_utc().year().to_string();
 
     if skip_prompt {
         return current_year.to_string();
@@ -122,8 +116,8 @@ fn get_year(skip_prompt: bool) -> String {
 
 // write license file
 fn write_file(path: &str, content: &str) -> Result<(), io::Error> {
-    let result = match !fs::metadata(path).is_ok() {
-        false => {
+    match fs::metadata(path) {
+        Ok(_) => {
             let path: String = Input::with_theme(&ColorfulTheme::default())
                 .with_prompt(
                     "LICENSE already exists, enter a new name else the content will be overridden!",
@@ -134,8 +128,6 @@ fn write_file(path: &str, content: &str) -> Result<(), io::Error> {
 
             fs::write(path, content)
         }
-        true => fs::write(path, content),
-    };
-
-    result
+        Err(_) => fs::write(path, content),
+    }
 }
